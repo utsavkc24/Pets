@@ -10,8 +10,8 @@ import androidx.annotation.Nullable;
  */
 public class PetDbHelper extends SQLiteOpenHelper {
     //If you change the database schema, you must increment the database version.
-    public static final int DATABASE_VERSION = 1;
-    public static final String DATABASE_NAME = "shelter.db";
+    private static final int DATABASE_VERSION = 1;
+    private static final String DATABASE_NAME = "shelter.db";
 
     /**
      * Constructs a new instance of {@link PetDbHelper}.
