@@ -87,7 +87,7 @@ public class CatalogActivity extends AppCompatActivity implements LoaderManager.
         values.put(PetContract.PetEntry.COLUMN_PET_NAME, "Toto");
         values.put(PetContract.PetEntry.COLUMN_PET_BREED, "Terrier");
         values.put(PetContract.PetEntry.COLUMN_PET_GENDER, PetContract.PetEntry.GENDER_MALE);
-        values.put(PetContract.PetEntry.COLUMN_PET_WEIGHT, "7 kg");
+        values.put(PetContract.PetEntry.COLUMN_PET_WEIGHT, "7");
 
         // Insert a new row for Toto into the provider using the ContentResolver.
         // Use the {@link PetEntry#CONTENT_URI} to indicate that we want to insert
