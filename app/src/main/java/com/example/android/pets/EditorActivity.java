@@ -95,6 +95,8 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         } else {
             //Otherwise this is an existing pet, so change app bar to say "Edit pet"
             setTitle(getString(R.string.editor_activity_title_edit_pet));
+            LoaderManager.getInstance(this).initLoader(EXISTING_PET_LOADER, null, this);
+
         }
         // Find all relevant views that we will need to read user input from
         mNameEditText = findViewById(R.id.edit_pet_name);
@@ -103,7 +105,6 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         mGenderSpinner = findViewById(R.id.spinner_gender);
 
         setupSpinner();
-        getSupportLoaderManager().initLoader(EXISTING_PET_LOADER, null, this);
     }
 
     /**
