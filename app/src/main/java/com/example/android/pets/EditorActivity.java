@@ -16,6 +16,7 @@
 package com.example.android.pets;
 
 import android.content.ContentValues;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -24,6 +25,7 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -33,6 +35,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NavUtils;
 import androidx.loader.app.LoaderManager;
@@ -77,6 +80,19 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
      * Content URI for the existing pet (null if it's a new pet)
      */
     private Uri mCurrentPetUri;
+    /**
+     * Boolean flag that keeps track of whether the pet has been edited (true) or not (false)
+     */
+    private boolean mPetHasChanged = false;
+    // OnTouchListener that listens for any user touches on a View, implying that they are modifying
+    // the view, and we change the mPetHasChanged boolean to true.
+    private View.OnTouchListener mTouchListener = new View.OnTouchListener() {
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            mPetHasChanged = true;
+            return false;
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,7 +120,17 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         mWeightEditText = findViewById(R.id.edit_pet_weight);
         mGenderSpinner = findViewById(R.id.spinner_gender);
 
+        // Setup OnTouchListeners on all the input fields, so we can determine if the user
+        // has touched or modified them. This will let us know if there are unsaved changes
+        // or not, if the user tries to leave the editor without saving.
+        mNameEditText.setOnTouchListener(mTouchListener);
+        mBreedEditText.setOnTouchListener(mTouchListener);
+        mWeightEditText.setOnTouchListener(mTouchListener);
+        mGenderSpinner.setOnTouchListener(mTouchListener);
+
+
         setupSpinner();
+
     }
 
     /**
@@ -159,7 +185,7 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         String weightString = mWeightEditText.getText().toString().trim();
         // Check if this is supposed to be a new pet
         // and check if all the fields in the editor are blank
-        if (mCurrentPetUri == null && TextUtils.isEmpty(nameString) && TextUtils.isEmpty(breedString) && TextUtils.isEmpty(weightString) && mGender == PetEntry.GENDER_UNKNOWN){
+        if (mCurrentPetUri == null && TextUtils.isEmpty(nameString) && TextUtils.isEmpty(breedString) && TextUtils.isEmpty(weightString) && mGender == PetEntry.GENDER_UNKNOWN) {
             // Since no fields were modified, we can return early without creating a new pet.
             return;
         }
@@ -171,7 +197,7 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         // If the weight is not provided by the user, don't try to parse the string into an
         // integer value. Use 0 by default.
         int weight = 0;
-        if (!TextUtils.isEmpty(weightString)){
+        if (!TextUtils.isEmpty(weightString)) {
             weight = Integer.parseInt(weightString);
         }
         values.put(PetEntry.COLUMN_PET_WEIGHT, weight);
@@ -236,12 +262,52 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
                 return true;
             // Respond to a click on the "Up" arrow button in the app bar
             case android.R.id.home:
-                // Navigate back to parent activity (CatalogActivity)
-                NavUtils.navigateUpFromSameTask(this);
-                return true;
+                // If the pet hasn't changed, continue with navigating up to parent activity
+                // which is the {@link CatalogActivity}.
+                if (!mPetHasChanged) {
+                    NavUtils.navigateUpFromSameTask(EditorActivity.this);
+                    return true;
+                }
+                // Otherwise if there are unsaved changes, setup a dialog to warn the user.
+                // Create a click listener to handle the user confirming that
+                // changes should be discarded.
+                DialogInterface.OnClickListener discardButtonClickListener = new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        // User clicked "Discard" button, navigate to parent activity.
+                        NavUtils.navigateUpFromSameTask(EditorActivity.this);
+                    }
+                };
+                //Show a dialog that notifies the user they have unsaved changes
+                showUnsavedChangesDialog(discardButtonClickListener);
         }
         return super.onOptionsItemSelected(item);
     }
+
+    @Override
+    public void onBackPressed() {
+        // If the pet hasn't changed, continue with handling back button press
+        if (!mPetHasChanged) {
+            super.onBackPressed();
+            return;
+        }
+        // Otherwise if there are unsaved changes, setup a dialog to warn the user.
+        // Create a click listener to handle the user confirming that changes should be discarded
+        DialogInterface.OnClickListener discardButtonCLickListener = new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                // User clicked "Discard" button, close the current activity.
+                finish();
+            }
+        };
+        //Show dialog that there are unsaved changes
+        showUnsavedChangesDialog(discardButtonCLickListener);
+    }
+
+    /**
+     * This method is called when the back button is pressed.
+     */
+
 
     @NonNull
     @Override
@@ -301,6 +367,7 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
                     mGenderSpinner.setSelection(0);
                     break;
             }
+
         }
 
     }
@@ -311,5 +378,33 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         mBreedEditText.setText("");
         mWeightEditText.setText("");
         mGenderSpinner.setSelection(0);
+    }
+
+    /**
+     * Show a dialog that warns the user there are unsaved changes that will be lost
+     * if they continue leaving the editor.
+     *
+     * @param discardButtonCLickListener is the click listener for what to do when
+     *                                   the user confirms they want to discard their changes
+     */
+    private void showUnsavedChangesDialog(DialogInterface.OnClickListener discardButtonCLickListener) {
+        // Create an AlertDialog.Builder and set the message, and click listeners
+        // for the positive and negative buttons on the dialog.
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage(R.string.unsaved_changes_dialog_msg);
+        builder.setPositiveButton(R.string.discard, discardButtonCLickListener);
+        builder.setNegativeButton(R.string.keep_editing, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                // User clicked the "Keep editing" button, so dismiss the dialog
+                // and continue editing the pet.
+                if (dialog != null) {
+                    dialog.dismiss();
+                }
+            }
+        });
+        //Create and show the AlertDialog
+        AlertDialog alertDialog = builder.create();
+        alertDialog.show();
     }
 }
