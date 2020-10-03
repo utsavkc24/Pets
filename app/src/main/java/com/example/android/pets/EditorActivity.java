@@ -22,7 +22,6 @@ import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -50,34 +49,34 @@ import com.example.android.pets.data.PetDbHelper;
 public class EditorActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
 
     /**
+     * Identifier for the pet data loader
+     */
+    private static final int EXISTING_PET_LOADER = 0;
+    /**
      * EditText field to enter the pet's name
      */
     private EditText mNameEditText;
-
     /**
      * EditText field to enter the pet's breed
      */
     private EditText mBreedEditText;
-
     /**
      * EditText field to enter the pet's weight
      */
     private EditText mWeightEditText;
-
     /**
      * EditText field to enter the pet's gender
      */
     private Spinner mGenderSpinner;
-
     /**
      * Gender of the pet. The possible values are:
      * 0 for unknown gender, 1 for male, 2 for female.
      */
     private int mGender = 0;
-    /** Content URI for the existing pet (null if it's a new pet) */
+    /**
+     * Content URI for the existing pet (null if it's a new pet)
+     */
     private Uri mCurrentPetUri;
-    /** Identifier for the pet data loader */
-    private static final int EXISTING_PET_LOADER = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -146,7 +145,10 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         });
     }
 
-    public void insertData() {
+    /**
+     * Get user input from editor and save pet into database.
+     **/
+    public void saveData() {
         PetDbHelper mDbHelper = new PetDbHelper(this);
         // Gets the data repository in write mode
         SQLiteDatabase db = mDbHelper.getWritableDatabase();
@@ -160,18 +162,40 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         values.put(PetContract.PetEntry.COLUMN_PET_BREED, breedString);
         values.put(PetContract.PetEntry.COLUMN_PET_GENDER, mGender);
         values.put(PetContract.PetEntry.COLUMN_PET_WEIGHT, weight);
-
-        // Insert a new pet into the provider, returning the content URI for the new pet.
-        Uri newUri = getContentResolver().insert(PetEntry.CONTENT_URI, values);
-
-        // Show a toast message depending on whether or not the insertion was successful
-        if (newUri == null) {
-            // If the new content URI is null, then there was an error with insertion.
-            Toast.makeText(this, getString(R.string.editor_insert_pet_failed), Toast.LENGTH_SHORT).show();
+        // Determine if this is a new or existing pet by checking if mCurrentPetUri is null or not
+        if (mCurrentPetUri == null) {
+            // This is a NEW pet, so insert a new pet into the provider,
+            // returning the content URI for the new pet.
+            Uri newUri = getContentResolver().insert(PetEntry.CONTENT_URI, values);
+            // Show a toast message depending on whether or not the insertion was successful
+            if (newUri == null) {
+                // If the new content URI is null, then there was an error with insertion.
+                Toast.makeText(this, getString(R.string.editor_insert_pet_failed), Toast.LENGTH_SHORT).show();
+            } else {
+                // Otherwise, the insertion was successful and we can display a toast.
+                Toast.makeText(this, getString(R.string.editor_insert_pet_sucsessful),
+                        Toast.LENGTH_SHORT).show();
+            }
         } else {
-            Toast.makeText(this, getString(R.string.editor_insert_pet_sucsessful), Toast.LENGTH_SHORT).show();
+            // Otherwise this is an EXISTING pet, so update the pet with content URI: mCurrentPetUri
+            // and pass in the new ContentValues. Pass in null for the selection and selection args
+            // because mCurrentPetUri will already identify the correct row in the database that
+            // we want to modify.
+            int rowAffected = getContentResolver().update(mCurrentPetUri, values, null, null);
+            // Show a toast message depending on whether or not the update was successful.
+            if (rowAffected == 0) {
+                // If no rows were affected, then there was an error with the update.
+                Toast.makeText(this, getString(R.string.editor_insert_pet_failed),
+                        Toast.LENGTH_SHORT).show();
+            } else {
+                // Otherwise, the update was successful and we can display a toast.
+                Toast.makeText(this, getString(R.string.editor_insert_pet_sucsessful),
+                        Toast.LENGTH_SHORT).show();
+            }
+
+
         }
-        Log.v("CatalogActivity", "New row ID" + newUri);
+        //Log.v("CatalogActivity", "New row ID" + mCurrentPetUri);
     }
 
     @Override
@@ -189,7 +213,7 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
             // Respond to a click on the "Save" menu option
             case R.id.action_save:
                 // Save pet to database
-                insertData();
+                saveData();
                 //Exit Activity
                 finish();
                 return true;
@@ -216,7 +240,7 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
                 PetEntry.COLUMN_PET_NAME,
                 PetEntry.COLUMN_PET_BREED,
                 PetEntry.COLUMN_PET_GENDER,
-                PetEntry.COLUMN_PET_WEIGHT };
+                PetEntry.COLUMN_PET_WEIGHT};
 
         // This loader will execute the ContentProvider's query method on a background thread
         return new CursorLoader(this,   // Parent activity context
@@ -229,9 +253,13 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
 
     @Override
     public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor cursor) {
+        // Bail early if the cursor is null or there is less than 1 row in the cursor
+        if (cursor == null || cursor.getCount() < 1) {
+            return;
+        }
         // Proceed with moving to the first row of the cursor and reading data from it
         // (This should be the only row in the cursor)
-        if (cursor.moveToFirst()){
+        if (cursor.moveToFirst()) {
             // Find the columns of pet attributes that we're interested in
             int nameColumnIndex = cursor.getColumnIndex(PetEntry.COLUMN_PET_NAME);
             int breedColumnIndex = cursor.getColumnIndex(PetEntry.COLUMN_PET_BREED);
@@ -249,7 +277,7 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
             // Gender is a dropdown spinner, so map the constant value from the database
             // into one of the dropdown options (0 is Unknown, 1 is Male, 2 is Female).
             // Then call setSelection() so that option is displayed on screen as the current selection
-            switch (gender){
+            switch (gender) {
                 case PetEntry.GENDER_MALE:
                     mGenderSpinner.setSelection(1);
                     break;
@@ -266,6 +294,9 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
 
     @Override
     public void onLoaderReset(@NonNull Loader<Cursor> loader) {
-
+        mNameEditText.setText("");
+        mBreedEditText.setText("");
+        mWeightEditText.setText("");
+        mGenderSpinner.setSelection(0);
     }
 }
