@@ -455,5 +455,5 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         }
         finish();
     }
-    
+
 }
